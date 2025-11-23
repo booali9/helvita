@@ -1,4 +1,4 @@
-# Helvita Backend
+# Helvita Backend 
 
 Node.js backend for Helvita with personal and business account registration, OTP verification, Stripe identity, and card creation.
 
