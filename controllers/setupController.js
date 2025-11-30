@@ -97,10 +97,21 @@ const personalIdentity = async (req, res) => {
 const businessIdentity = async (req, res) => {
   const { email } = req.body;
 
+  console.log('Business identity request for email:', email);
+
   try {
     const user = await User.findOne({ email });
-    if (!user || user.accountType !== 'business') {
-      return res.status(400).json({ msg: 'Invalid user' });
+    
+    if (!user) {
+      console.log('User not found:', email);
+      return res.status(400).json({ msg: 'User not found' });
+    }
+    
+    console.log('User found:', user.email, 'Account type:', user.accountType);
+    
+    if (user.accountType !== 'business') {
+      console.log('Invalid account type. Expected: business, Got:', user.accountType);
+      return res.status(400).json({ msg: 'Invalid account type. This endpoint is for business accounts only.' });
     }
 
     // Use stripeService to create identity session with return URL
@@ -116,7 +127,7 @@ const businessIdentity = async (req, res) => {
       session_id: verificationSession.id
     });
   } catch (err) {
-    console.error(err.message);
+    console.error('Business identity error:', err.message);
     res.status(500).send('Server error');
   }
 };
