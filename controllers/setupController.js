@@ -65,15 +65,21 @@ const businessSetup = async (req, res) => {
   }
 };
 
-// Stripe Identity for personal
+// Stripe Identity for personal (also works for any account type)
 const personalIdentity = async (req, res) => {
   const { email } = req.body;
 
+  console.log('Personal identity request for email:', email);
+
   try {
     const user = await User.findOne({ email });
-    if (!user || user.accountType !== 'personal') {
-      return res.status(400).json({ msg: 'Invalid user' });
+    
+    if (!user) {
+      console.log('User not found:', email);
+      return res.status(400).json({ msg: 'User not found' });
     }
+
+    console.log('User found:', user.email, 'Account type:', user.accountType);
 
     // Use stripeService to create identity session with return URL
     const verificationSession = await createIdentitySession(user._id);
@@ -88,12 +94,12 @@ const personalIdentity = async (req, res) => {
       session_id: verificationSession.id
     });
   } catch (err) {
-    console.error(err.message);
+    console.error('Personal identity error:', err.message);
     res.status(500).send('Server error');
   }
 };
 
-// Stripe Identity for business
+// Stripe Identity for business (also works for any account type)
 const businessIdentity = async (req, res) => {
   const { email } = req.body;
 
@@ -108,16 +114,16 @@ const businessIdentity = async (req, res) => {
     }
     
     console.log('User found:', user.email, 'Account type:', user.accountType);
-    
-    if (user.accountType !== 'business') {
-      console.log('Invalid account type. Expected: business, Got:', user.accountType);
-      return res.status(400).json({ msg: 'Invalid account type. This endpoint is for business accounts only.' });
-    }
 
     // Use stripeService to create identity session with return URL
     const verificationSession = await createIdentitySession(user._id);
 
-    user.businessStripeIdentityId = verificationSession.id;
+    // Save to appropriate field based on account type
+    if (user.accountType === 'business') {
+      user.businessStripeIdentityId = verificationSession.id;
+    } else {
+      user.stripeIdentityId = verificationSession.id;
+    }
     await user.save();
 
     // Return both client_secret (for backward compatibility) and the Stripe-hosted URL
