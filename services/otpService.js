@@ -1,13 +1,26 @@
 const nodemailer = require('nodemailer');
 const User = require('../models/User');
 
-const transporter = nodemailer.createTransporter({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
+let transporter = null;
+
+const getTransporter = () => {
+  if (!transporter) {
+    try {
+      transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS
+        }
+      });
+      console.log('Transporter created successfully');
+    } catch (error) {
+      console.error('Error creating transporter:', error);
+      throw error;
+    }
   }
-});
+  return transporter;
+};
 
 const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -22,7 +35,7 @@ const sendOTP = async (email, otp) => {
   };
 
   try {
-    await transporter.sendMail(mailOptions);
+    await getTransporter().sendMail(mailOptions);
     console.log('OTP sent to', email);
   } catch (error) {
     console.error('Error sending OTP:', error);

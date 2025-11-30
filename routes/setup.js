@@ -6,7 +6,9 @@ const {
   businessIdentity,
   createCard,
   acceptTerms,
-  adminApprove
+  adminApprove,
+  verifyDocumentStatus,
+  generateVerificationQRCode
 } = require('../controllers/setupController');
 
 const router = express.Router();
@@ -25,6 +27,12 @@ router.post('/business-identity', businessIdentity);
 
 // Create card via Stripe
 router.post('/create-card', createCard);
+
+// Generate QR code for verification
+router.post('/generate-qr-code', generateVerificationQRCode);
+
+// Verify document status after mobile scan
+router.post('/verify-document-status', verifyDocumentStatus);
 
 // Accept terms
 router.post('/accept-terms', acceptTerms);

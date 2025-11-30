@@ -36,6 +36,11 @@ const register = async (req, res) => {
     user.otpExpires = Date.now() + parseInt(process.env.OTP_EXPIRY) * 60 * 1000;
     await user.save();
 
+    // Log OTP to console for testing
+    console.log('=================================');
+    console.log(`OTP for ${email}: ${otp}`);
+    console.log('=================================');
+
     await otpService.sendOTP(email, otp);
 
     res.json({ message: 'OTP sent to email' });

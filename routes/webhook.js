@@ -9,10 +9,16 @@ router.post('/stripe-identity', express.raw({ type: 'application/json' }), async
   const sig = req.headers['stripe-signature'];
   const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
+  console.log('Received webhook request');
+  console.log('Signature present:', !!sig);
+  console.log('Endpoint secret present:', !!endpointSecret);
+
   let event;
 
   try {
     event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+    console.log('Webhook event type:', event.type);
+    console.log('Event data:', JSON.stringify(event.data.object, null, 2));
   } catch (err) {
     console.log(`Webhook signature verification failed.`, err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
@@ -20,9 +26,10 @@ router.post('/stripe-identity', express.raw({ type: 'application/json' }), async
 
   try {
     await stripeService.handleIdentityWebhook(event);
+    console.log('Webhook processed successfully');
     res.json({ received: true });
   } catch (err) {
-    console.error(err);
+    console.error('Webhook processing error:', err);
     res.status(500).json({ error: 'Webhook processing failed' });
   }
 });

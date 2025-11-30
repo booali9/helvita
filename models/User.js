@@ -11,6 +11,11 @@ const userSchema = new mongoose.Schema({
   otpExpires: { type: Date },
   stripeCustomerId: { type: String },
   stripeIdentitySessionId: { type: String },
+  stripeIdentityId: { type: String },
+  businessStripeIdentityId: { type: String },
+  currentVerificationSessionId: { type: String },
+  documentVerificationStatus: { type: String, enum: ['pending', 'verified', 'unverified', 'requires_input', 'processing', 'canceled'], default: 'pending' },
+  documentVerificationDate: { type: Date },
   stripeCardId: { type: String },
   personalProfile: { type: mongoose.Schema.Types.ObjectId, ref: 'PersonalProfile' },
   businessProfile: { type: mongoose.Schema.Types.ObjectId, ref: 'BusinessProfile' }
