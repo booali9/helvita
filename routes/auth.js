@@ -1,6 +1,7 @@
 const express = require('express');
 const { body } = require('express-validator');
 const { register, verifyOtp, login } = require('../controllers/authController');
+const auth = require('../middlewares/auth');
 
 const router = express.Router();
 
@@ -114,5 +115,12 @@ router.post('/login', [
   body('email').isEmail().normalizeEmail(),
   body('password').exists()
 ], login);
+
+// Get referral link
+router.get('/referral-link', auth, (req, res) => {
+  const userId = req.user.id;
+  const referralLink = `${process.env.FRONTEND_URL}/register?ref=${req.user.referralCode}`;
+  res.json({ referralLink });
+});
 
 module.exports = router;

@@ -11,7 +11,7 @@ const register = async (req, res) => {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { email, password, accountType } = req.body;
+  const { email, password, accountType, referralCode } = req.body;
 
   try {
     let user = await User.findOne({ email });
@@ -22,10 +22,24 @@ const register = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
+    // Generate unique referral code
+    const userReferralCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+    let referredBy = null;
+    if (referralCode) {
+      const referrer = await User.findOne({ referralCode });
+      if (referrer) {
+        referredBy = referrer._id;
+        // Optionally, credit referrer here
+      }
+    }
+
     user = new User({
       email,
       password: hashedPassword,
-      accountType
+      accountType,
+      referralCode: userReferralCode,
+      referredBy
     });
 
     await user.save();

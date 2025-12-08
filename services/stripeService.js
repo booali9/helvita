@@ -149,10 +149,85 @@ const handleIdentityWebhook = async (event) => {
   await user.save();
 };
 
+const blockCard = async (cardId) => {
+  try {
+    const card = await stripe.issuing.cards.update(cardId, {
+      status: 'blocked',
+    });
+    return card;
+  } catch (error) {
+    throw new Error('Error blocking card: ' + error.message);
+  }
+};
+
+const sendMoney = async (fromUserId, toUserId, amount, currency = 'usd') => {
+  // This is a simplified P2P transfer using Stripe
+  // In reality, need connected accounts or use Stripe's transfer API
+  // For demo, assume users have Stripe customer IDs
+
+  const fromUser = await User.findById(fromUserId);
+  const toUser = await User.findById(toUserId);
+
+  if (!fromUser.stripeCustomerId || !toUser.stripeCustomerId) {
+    throw new Error('Users must have Stripe customer IDs');
+  }
+
+  // Create a payment intent from sender to receiver
+  // But Stripe doesn't directly support P2P; this is simplified
+  // Perhaps use Stripe's transfer for connected accounts
+
+  // For now, throw error as it's complex
+  throw new Error('P2P transfers not fully implemented; requires connected accounts');
+};
+
+const createInvoice = async (customerId, amount, description) => {
+  try {
+    const invoice = await stripe.invoices.create({
+      customer: customerId,
+      amount: amount * 100, // Amount in cents
+      currency: 'usd',
+      description,
+    });
+    return invoice;
+  } catch (error) {
+    throw new Error('Error creating invoice: ' + error.message);
+  }
+};
+
+const listInvoices = async (customerId) => {
+  try {
+    const invoices = await stripe.invoices.list({
+      customer: customerId,
+    });
+    return invoices.data;
+  } catch (error) {
+    throw new Error('Error listing invoices: ' + error.message);
+  }
+};
+
+const createPaymentIntent = async (amount, currency = 'usd', paymentMethodId) => {
+  try {
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amount * 100,
+      currency,
+      payment_method: paymentMethodId,
+      confirm: true,
+    });
+    return paymentIntent;
+  } catch (error) {
+    throw new Error('Error creating payment intent: ' + error.message);
+  }
+};
+
 module.exports = {
   createIdentitySession,
   createIssuingCard,
   checkVerificationStatus,
   generateQRCode,
-  handleIdentityWebhook
+  handleIdentityWebhook,
+  blockCard,
+  sendMoney,
+  createInvoice,
+  listInvoices,
+  createPaymentIntent
 };

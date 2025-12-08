@@ -13,6 +13,9 @@ const businessRoutes = require('./routes/business');
 const adminRoutes = require('./routes/admin');
 const webhookRoutes = require('./routes/webhook');
 const setupRoutes = require('./routes/setup');
+const plaidRoutes = require('./routes/plaid');
+const cardRoutes = require('./routes/card');
+const supportRoutes = require('./routes/support');
 
 const app = express();
 
@@ -41,6 +44,9 @@ app.use('/api/personal', personalRoutes);
 app.use('/api/business', businessRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/setup', setupRoutes);
+app.use('/api/plaid', plaidRoutes);
+app.use('/api/card', cardRoutes);
+app.use('/api/support', supportRoutes);
 
 // MongoDB connection
 mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
@@ -54,4 +60,4 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`helvita backend is running sucessfully`));
+app.listen(PORT, () => console.log(`helvita backend is running successfully on port ${PORT}`));

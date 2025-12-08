@@ -8,6 +8,7 @@
     "dev": "nodemon server.js"
   },
   "dependencies": {
+    "axios": "^1.13.2",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
@@ -16,6 +17,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^7.5.3",
     "nodemailer": "^6.9.5",
+    "plaid": "^40.0.0",
     "qrcode": "^1.5.3",
     "stripe": "^12.17.0",
     "swagger-jsdoc": "^6.2.8",
