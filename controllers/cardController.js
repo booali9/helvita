@@ -1,6 +1,72 @@
 const stripeService = require('../services/stripeService');
 const User = require('../models/User');
 
+// Add external card/payment method
+const addCard = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { cardNumber, cardName, expiry, cvv } = req.body;
+
+    console.log('Add card request:', { userId, cardNumber: cardNumber?.slice(-4), cardName, expiry });
+
+    if (!cardNumber || !cardName || !expiry) {
+      return res.status(400).json({ error: 'Card number, name and expiry are required' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Parse expiry date safely
+    let expMonth = 12;
+    let expYear = 2029;
+    
+    if (expiry.includes('/')) {
+      const parts = expiry.split('/');
+      expMonth = parseInt(parts[0]) || 12;
+      const yearPart = parts[1] || '29';
+      expYear = yearPart.length === 2 ? parseInt('20' + yearPart) : parseInt(yearPart);
+    }
+
+    // Store card details (in production, you'd use Stripe to tokenize)
+    // For now, we'll store a masked version in the user's saved cards
+    const maskedCard = {
+      id: `card_${Date.now()}`,
+      last4: cardNumber.slice(-4),
+      brand: detectCardBrand(cardNumber),
+      cardholderName: cardName,
+      expMonth: expMonth,
+      expYear: expYear,
+      cardType: 'external',
+      addedAt: new Date()
+    };
+
+    // Add to user's saved cards array
+    if (!user.savedCards) {
+      user.savedCards = [];
+    }
+    user.savedCards.push(maskedCard);
+    await user.save();
+
+    console.log('Card added successfully:', maskedCard.id);
+    res.json({ message: 'Card added successfully', card: maskedCard });
+  } catch (error) {
+    console.error('Error adding card:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Helper function to detect card brand
+const detectCardBrand = (cardNumber) => {
+  const num = cardNumber.replace(/\s/g, '');
+  if (/^4/.test(num)) return 'visa';
+  if (/^5[1-5]/.test(num)) return 'mastercard';
+  if (/^3[47]/.test(num)) return 'amex';
+  if (/^6(?:011|5)/.test(num)) return 'discover';
+  return 'unknown';
+};
+
 // Block card
 const blockCard = async (req, res) => {
   try {
@@ -87,6 +153,7 @@ const makePayment = async (req, res) => {
 };
 
 module.exports = {
+  addCard,
   blockCard,
   changePin,
   requestCard,

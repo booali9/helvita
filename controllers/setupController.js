@@ -153,6 +153,7 @@ const createCard = async (req, res) => {
 
     user.stripeCardId = card.id;
     user.cardName = cardName;
+    user.cardHolderName = cardName;  // Also save as cardHolderName for display
     user.businessNameOnCard = businessNameOnCard;
     user.cardDeliveryAddress = cardDeliveryAddress;
     await user.save();

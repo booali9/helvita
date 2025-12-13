@@ -18,7 +18,11 @@ const businessProfileSchema = new mongoose.Schema({
   websiteOrSocialLink: { type: String },
   monthlyRevenue: { type: Number, required: true },
   transferPurpose: { type: String, required: true },
-  stripeVerificationStatus: { type: String, default: 'pending' }
+  stripeVerificationStatus: { type: String, default: 'pending' },
+  // Debit card details
+  nameOnCard: { type: String },
+  businessNameOnCard: { type: String },
+  cardDeliveryEmail: { type: String }
 }, { timestamps: true });
 
 module.exports = mongoose.model('BusinessProfile', businessProfileSchema);

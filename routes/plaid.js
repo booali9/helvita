@@ -1,5 +1,5 @@
 const express = require('express');
-const { createLinkToken, exchangePublicToken, getTransactions, getAccounts, getTransactionSummary, getCardDetails, getReserves } = require('../controllers/plaidController');
+const { createLinkToken, exchangePublicToken, getTransactions, getAccounts, getTransactionSummary, getCardDetails, getReserves, initiateTransfer } = require('../controllers/plaidController');
 const auth = require('../middlewares/auth');
 
 const router = express.Router();
@@ -27,5 +27,8 @@ router.get('/card-details', getCardDetails);
 
 // Get all reserves
 router.get('/reserves', getReserves);
+
+// Initiate a transfer
+router.post('/transfer', initiateTransfer);
 
 module.exports = router;

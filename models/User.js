@@ -16,13 +16,50 @@ const userSchema = new mongoose.Schema({
   currentVerificationSessionId: { type: String },
   documentVerificationStatus: { type: String, enum: ['pending', 'verified', 'unverified', 'requires_input', 'processing', 'canceled'], default: 'pending' },
   documentVerificationDate: { type: Date },
-   stripeCardId: { type: String },
-   plaidAccessToken: { type: String },
-   plaidItemId: { type: String },
-   referralCode: { type: String },
-   referredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-   personalProfile: { type: mongoose.Schema.Types.ObjectId, ref: 'PersonalProfile' },
-   businessProfile: { type: mongoose.Schema.Types.ObjectId, ref: 'BusinessProfile' }
+  stripeCardId: { type: String },
+  stripeCardholderId: { type: String },
+  cardHolderName: { type: String },
+  cardName: { type: String },
+  businessNameOnCard: { type: String },
+  plaidAccessToken: { type: String },
+  plaidItemId: { type: String },
+  referralCode: { type: String, unique: true },
+  referredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  // Track sent referral invites - each user has their own array
+  sentReferrals: {
+    type: [{
+      email: { type: String },
+      name: { type: String },
+      sentAt: { type: Date, default: Date.now },
+      status: { type: String, enum: ['Pending', 'Registered', 'Completed'], default: 'Pending' },
+      registeredUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      registeredAt: { type: Date }
+    }],
+    default: []
+  },
+  // Saved external cards - each user has their own array
+  savedCards: {
+    type: [{
+      id: { type: String },
+      last4: { type: String },
+      brand: { type: String },
+      cardholderName: { type: String },
+      expMonth: { type: Number },
+      expYear: { type: Number },
+      cardType: { type: String },
+      addedAt: { type: Date }
+    }],
+    default: []
+  },
+  personalProfile: { type: mongoose.Schema.Types.ObjectId, ref: 'PersonalProfile' },
+  businessProfile: { type: mongoose.Schema.Types.ObjectId, ref: 'BusinessProfile' }
 }, { timestamps: true });
+
+// Pre-save hook to ensure arrays are initialized
+userSchema.pre('save', function(next) {
+  if (!this.savedCards) this.savedCards = [];
+  if (!this.sentReferrals) this.sentReferrals = [];
+  next();
+});
 
 module.exports = mongoose.model('User', userSchema);

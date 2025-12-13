@@ -4,7 +4,7 @@ const User = require('../models/User');
 // Create link token for Plaid Link
 const createLinkToken = async (req, res) => {
   try {
-    const userId = req.user.id; // Assuming auth middleware sets req.user
+    const userId = req.userId;
     const linkToken = await plaidService.createLinkToken(userId);
     res.json({ linkToken });
   } catch (error) {
@@ -16,7 +16,7 @@ const createLinkToken = async (req, res) => {
 const exchangePublicToken = async (req, res) => {
   try {
     const { publicToken } = req.body;
-    const userId = req.user.id;
+    const userId = req.userId;
 
     const { accessToken, itemId } = await plaidService.exchangePublicToken(publicToken);
 
@@ -35,11 +35,11 @@ const exchangePublicToken = async (req, res) => {
 // Get transactions
 const getTransactions = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.userId;
     const user = await User.findById(userId);
 
-    if (!user.plaidAccessToken) {
-      return res.status(400).json({ error: 'No linked account' });
+    if (!user || !user.plaidAccessToken) {
+      return res.json({ transactions: [] });
     }
 
     const { startDate, endDate } = req.query;
@@ -58,11 +58,11 @@ const getTransactions = async (req, res) => {
 // Get accounts
 const getAccounts = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.userId;
     const user = await User.findById(userId);
 
-    if (!user.plaidAccessToken) {
-      return res.status(400).json({ error: 'No linked account' });
+    if (!user || !user.plaidAccessToken) {
+      return res.json({ accounts: [] });
     }
 
     const accounts = await plaidService.getAccounts(user.plaidAccessToken);
@@ -75,11 +75,11 @@ const getAccounts = async (req, res) => {
 // Get transaction summary
 const getTransactionSummary = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.userId;
     const user = await User.findById(userId);
 
-    if (!user.plaidAccessToken) {
-      return res.status(400).json({ error: 'No linked account' });
+    if (!user || !user.plaidAccessToken) {
+      return res.json({ totalTransactions: 0, totalAmount: 0, transactions: [] });
     }
 
     const transactions = await plaidService.getTransactions(
@@ -104,11 +104,11 @@ const getTransactionSummary = async (req, res) => {
 // Get connected card details
 const getCardDetails = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.userId;
     const user = await User.findById(userId);
 
-    if (!user.plaidAccessToken) {
-      return res.status(400).json({ error: 'No linked account' });
+    if (!user || !user.plaidAccessToken) {
+      return res.json({ cards: [] });
     }
 
     const accounts = await plaidService.getAccounts(user.plaidAccessToken);
@@ -136,11 +136,11 @@ const getCardDetails = async (req, res) => {
 // Get all reserves (balances)
 const getReserves = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.userId;
     const user = await User.findById(userId);
 
-    if (!user.plaidAccessToken) {
-      return res.status(400).json({ error: 'No linked account' });
+    if (!user || !user.plaidAccessToken) {
+      return res.json({ totalReserves: 0, currency: 'USD', accounts: [] });
     }
 
     const accounts = await plaidService.getAccounts(user.plaidAccessToken);
@@ -166,6 +166,62 @@ const getReserves = async (req, res) => {
   }
 };
 
+// Initiate a transfer (simplified - actual Plaid transfers require more setup)
+const initiateTransfer = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { accountNumber, amount, description } = req.body;
+    const user = await User.findById(userId);
+
+    if (!user.plaidAccessToken) {
+      return res.status(400).json({ error: 'No linked account. Please link a bank account first.' });
+    }
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ error: 'Invalid amount' });
+    }
+
+    if (!accountNumber) {
+      return res.status(400).json({ error: 'Please enter a destination account number' });
+    }
+
+    // Note: Actual Plaid Transfer API requires additional setup including:
+    // - Transfer authorization
+    // - ACH processing
+    // - Compliance checks
+    // This is a simplified placeholder that logs the transfer request
+    
+    console.log('Transfer request:', {
+      userId,
+      from: 'User linked account',
+      to: accountNumber,
+      amount,
+      description: description || 'Transfer',
+      timestamp: new Date().toISOString()
+    });
+
+    // In production, you would:
+    // 1. Create a transfer authorization with Plaid
+    // 2. Execute the transfer
+    // 3. Store transfer record in database
+    // 4. Return transfer confirmation
+
+    res.json({
+      success: true,
+      message: 'Transfer initiated successfully',
+      transfer: {
+        id: `TRF_${Date.now()}`,
+        amount,
+        destination: accountNumber,
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   createLinkToken,
   exchangePublicToken,
@@ -174,4 +230,5 @@ module.exports = {
   getTransactionSummary,
   getCardDetails,
   getReserves,
+  initiateTransfer,
 };

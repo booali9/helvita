@@ -1,11 +1,14 @@
 const express = require('express');
-const { blockCard, changePin, requestCard, createInvoice, listInvoices, makePayment } = require('../controllers/cardController');
+const { addCard, blockCard, changePin, requestCard, createInvoice, listInvoices, makePayment } = require('../controllers/cardController');
 const auth = require('../middlewares/auth');
 
 const router = express.Router();
 
 // All routes require authentication
 router.use(auth);
+
+// Add external card
+router.post('/add', addCard);
 
 // Block card
 router.post('/block', blockCard);

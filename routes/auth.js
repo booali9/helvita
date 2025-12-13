@@ -1,6 +1,6 @@
 const express = require('express');
 const { body } = require('express-validator');
-const { register, verifyOtp, login } = require('../controllers/authController');
+const { register, verifyOtp, login, getProfile, getReferrals, deleteAccount } = require('../controllers/authController');
 const auth = require('../middlewares/auth');
 
 const router = express.Router();
@@ -115,6 +115,41 @@ router.post('/login', [
   body('email').isEmail().normalizeEmail(),
   body('password').exists()
 ], login);
+
+/**
+ * @swagger
+ * /auth/profile:
+ *   get:
+ *     summary: Get user profile with card details
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User profile retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   type: object
+ *                 profile:
+ *                   type: object
+ *                 card:
+ *                   type: object
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: User not found
+ */
+router.get('/profile', auth, getProfile);
+
+// Get user's referrals
+router.get('/referrals', auth, getReferrals);
+
+// Delete user account
+router.delete('/delete-account', auth, deleteAccount);
 
 // Get referral link
 router.get('/referral-link', auth, (req, res) => {

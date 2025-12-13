@@ -1,5 +1,5 @@
 const express = require('express');
-const { sendSupportMessage, sendNotification } = require('../controllers/supportController');
+const { sendSupportMessage, sendNotification, sendReferralInvites } = require('../controllers/supportController');
 const auth = require('../middlewares/auth');
 
 const router = express.Router();
@@ -12,5 +12,8 @@ router.post('/message', sendSupportMessage);
 
 // Send notification (admin only?)
 router.post('/notification', sendNotification);
+
+// Send referral invites
+router.post('/referral-invite', sendReferralInvites);
 
 module.exports = router;
