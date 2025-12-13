@@ -11,7 +11,7 @@ const options = {
     },
     servers: [
       {
-        url: 'http://localhost:5000/api',
+        url: process.env.NODE_ENV === 'production' ? 'https://helvitabackend.vercel.app/api' : 'http://localhost:5000/api',
       },
     ],
     components: {

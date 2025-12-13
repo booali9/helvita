@@ -9,7 +9,7 @@ const createIdentitySession = async (userId, returnUrl = null) => {
   }
 
   // Create verification session with return_url for Stripe-hosted verification page
-  const finalReturnUrl = returnUrl || `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verification-complete`;
+  const finalReturnUrl = returnUrl || `${process.env.FRONTEND_URL || 'https://helvitafrontend.vercel.app'}/verification-complete`;
   
   console.log('Creating identity session for user:', userId);
   console.log('Return URL:', finalReturnUrl);

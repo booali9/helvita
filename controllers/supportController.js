@@ -29,7 +29,7 @@ const sendReferralInvites = async (req, res) => {
     }
 
     const transporter = createTransporter();
-    const referralLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/register?ref=${user.referralCode}`;
+    const referralLink = `${process.env.FRONTEND_URL || 'https://helvitafrontend.vercel.app'}/register?ref=${user.referralCode}`;
     const senderName = user.cardHolderName || user.email.split('@')[0];
 
     // Send emails to all recipients
