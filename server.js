@@ -32,8 +32,14 @@ app.get('/', (req, res) => {
 // Swagger documentation
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
 
-// Webhook route needs raw body - MUST be before express.json() middleware
-app.use('/api/webhook', webhookRoutes);
+// For Vercel: Store raw body for webhook routes BEFORE any body parsing
+app.use('/api/webhook', express.raw({ type: 'application/json' }), (req, res, next) => {
+  // Store the raw body for Stripe webhook verification
+  if (Buffer.isBuffer(req.body)) {
+    req.rawBody = req.body;
+  }
+  next();
+}, webhookRoutes);
 
 // Apply JSON parsing for all other routes
 app.use(express.json());

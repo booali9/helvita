@@ -1,5 +1,5 @@
 const express = require('express');
-const { createLinkToken, exchangePublicToken, getTransactions, getAccounts, getTransactionSummary, getCardDetails, getReserves, initiateTransfer } = require('../controllers/plaidController');
+const { createLinkToken, exchangePublicToken, getTransactions, getAccounts, getTransactionSummary, getCardDetails, getReserves, initiateTransfer, quickTransfer, unlinkAccount, getTransfers } = require('../controllers/plaidController');
 const auth = require('../middlewares/auth');
 
 const router = express.Router();
@@ -12,6 +12,9 @@ router.post('/create-link-token', createLinkToken);
 
 // Exchange public token
 router.post('/exchange-public-token', exchangePublicToken);
+
+// Unlink bank account
+router.post('/unlink', unlinkAccount);
 
 // Get transactions
 router.get('/transactions', getTransactions);
@@ -28,7 +31,13 @@ router.get('/card-details', getCardDetails);
 // Get all reserves
 router.get('/reserves', getReserves);
 
+// Get user's transfer history
+router.get('/transfers', getTransfers);
+
 // Initiate a transfer
 router.post('/transfer', initiateTransfer);
+
+// Quick transfer to linked Plaid account
+router.post('/quick-transfer', quickTransfer);
 
 module.exports = router;

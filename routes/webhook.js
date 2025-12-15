@@ -5,18 +5,24 @@ const stripeService = require('../services/stripeService');
 const router = express.Router();
 
 // Stripe webhook for identity verification
-router.post('/stripe-identity', express.raw({ type: 'application/json' }), async (req, res) => {
+router.post('/stripe-identity', async (req, res) => {
   const sig = req.headers['stripe-signature'];
   const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
   console.log('Received webhook request');
   console.log('Signature present:', !!sig);
   console.log('Endpoint secret present:', !!endpointSecret);
+  console.log('Body type:', typeof req.body);
+  console.log('Is Buffer:', Buffer.isBuffer(req.body));
+  console.log('Has rawBody:', !!req.rawBody);
 
   let event;
 
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+    // Use rawBody if available (set by server.js), otherwise use req.body
+    const payload = req.rawBody || req.body;
+    
+    event = stripe.webhooks.constructEvent(payload, sig, endpointSecret);
     console.log('Webhook event type:', event.type);
     console.log('Event data:', JSON.stringify(event.data.object, null, 2));
   } catch (err) {

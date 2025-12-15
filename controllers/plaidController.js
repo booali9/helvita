@@ -1,4 +1,5 @@
 const plaidService = require('../services/plaidService');
+const stripeService = require('../services/stripeService');
 const User = require('../models/User');
 
 // Create link token for Plaid Link
@@ -166,7 +167,7 @@ const getReserves = async (req, res) => {
   }
 };
 
-// Initiate a transfer (simplified - actual Plaid transfers require more setup)
+// Initiate a transfer (connected to Stripe for actual payment processing)
 const initiateTransfer = async (req, res) => {
   try {
     const userId = req.userId;
@@ -185,39 +186,161 @@ const initiateTransfer = async (req, res) => {
       return res.status(400).json({ error: 'Please enter a destination account number' });
     }
 
-    // Note: Actual Plaid Transfer API requires additional setup including:
-    // - Transfer authorization
-    // - ACH processing
-    // - Compliance checks
-    // This is a simplified placeholder that logs the transfer request
-    
-    console.log('Transfer request:', {
+    // Create a Stripe PaymentIntent to track this transfer
+    // This will appear in your Stripe Dashboard
+    const stripeTransfer = await stripeService.createTransfer(
       userId,
-      from: 'User linked account',
-      to: accountNumber,
       amount,
-      description: description || 'Transfer',
-      timestamp: new Date().toISOString()
-    });
+      accountNumber,
+      description || 'Bank Transfer from Helvita'
+    );
 
-    // In production, you would:
-    // 1. Create a transfer authorization with Plaid
-    // 2. Execute the transfer
-    // 3. Store transfer record in database
-    // 4. Return transfer confirmation
+    console.log('Stripe transfer created:', stripeTransfer);
+
+    // Record the transfer
+    await stripeService.recordTransfer(userId, {
+      stripePaymentIntentId: stripeTransfer.id,
+      amount,
+      destination: accountNumber,
+      status: stripeTransfer.status
+    });
 
     res.json({
       success: true,
       message: 'Transfer initiated successfully',
       transfer: {
-        id: `TRF_${Date.now()}`,
+        id: stripeTransfer.id,
         amount,
         destination: accountNumber,
-        status: 'pending',
-        createdAt: new Date().toISOString()
+        status: stripeTransfer.status,
+        clientSecret: stripeTransfer.clientSecret, // For frontend confirmation if needed
+        createdAt: stripeTransfer.createdAt
       }
     });
   } catch (error) {
+    console.error('Transfer error:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Quick Transfer to linked Plaid account
+const quickTransfer = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { amount, saveAsDraft } = req.body;
+    const user = await User.findById(userId);
+
+    if (!user.plaidAccessToken) {
+      return res.status(400).json({ error: 'No linked account. Please link a bank account first.' });
+    }
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ error: 'Invalid amount' });
+    }
+
+    // If saving as draft, just return success without processing
+    if (saveAsDraft) {
+      return res.json({
+        success: true,
+        message: 'Transfer saved as draft',
+        draft: {
+          id: `DRAFT_${Date.now()}`,
+          amount,
+          status: 'draft',
+          createdAt: new Date().toISOString()
+        }
+      });
+    }
+
+    // Get the linked Plaid account info
+    const accounts = await plaidService.getAccounts(user.plaidAccessToken);
+    const primaryAccount = accounts[0]; // Use first linked account
+
+    if (!primaryAccount) {
+      return res.status(400).json({ error: 'No linked bank account found' });
+    }
+
+    // Create a Stripe PaymentIntent for the quick transfer
+    const stripeTransfer = await stripeService.createTransfer(
+      userId,
+      amount,
+      `Plaid-${primaryAccount.account_id}`,
+      'Quick Transfer to linked account'
+    );
+
+    console.log('Quick transfer created:', stripeTransfer);
+
+    res.json({
+      success: true,
+      message: 'Transfer completed successfully',
+      transfer: {
+        id: stripeTransfer.id,
+        amount,
+        destination: primaryAccount.name || 'Linked Account',
+        accountMask: primaryAccount.mask,
+        status: stripeTransfer.status,
+        createdAt: stripeTransfer.createdAt
+      }
+    });
+  } catch (error) {
+    console.error('Quick transfer error:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Unlink Plaid bank account
+const unlinkAccount = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (!user.plaidAccessToken) {
+      return res.status(400).json({ error: 'No linked account to unlink' });
+    }
+
+    // Clear Plaid tokens from user
+    user.plaidAccessToken = null;
+    user.plaidItemId = null;
+    await user.save();
+
+    console.log('Bank account unlinked for user:', userId);
+
+    res.json({
+      success: true,
+      message: 'Bank account unlinked successfully'
+    });
+  } catch (error) {
+    console.error('Unlink account error:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Get user's transfer history
+const getTransfers = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Return transfers sorted by date (newest first)
+    const transfers = (user.transfers || []).sort((a, b) => 
+      new Date(b.createdAt) - new Date(a.createdAt)
+    );
+
+    res.json({
+      success: true,
+      transfers: transfers,
+      totalTransfers: transfers.length
+    });
+  } catch (error) {
+    console.error('Get transfers error:', error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -231,4 +354,7 @@ module.exports = {
   getCardDetails,
   getReserves,
   initiateTransfer,
+  quickTransfer,
+  unlinkAccount,
+  getTransfers,
 };

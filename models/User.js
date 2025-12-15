@@ -9,6 +9,8 @@ const userSchema = new mongoose.Schema({
   adminApproved: { type: Boolean, default: false },
   otp: { type: String },
   otpExpires: { type: Date },
+  resetPasswordOtp: { type: String },
+  resetPasswordOtpExpires: { type: Date },
   stripeCustomerId: { type: String },
   stripeIdentitySessionId: { type: String },
   stripeIdentityId: { type: String },
@@ -48,6 +50,19 @@ const userSchema = new mongoose.Schema({
       expYear: { type: Number },
       cardType: { type: String },
       addedAt: { type: Date }
+    }],
+    default: []
+  },
+  // Track transfers made by the user
+  transfers: {
+    type: [{
+      id: { type: String },
+      stripePaymentIntentId: { type: String },
+      amount: { type: Number },
+      destination: { type: String },
+      status: { type: String, enum: ['pending', 'completed', 'failed', 'recorded', 'pending_processing'], default: 'pending' },
+      description: { type: String },
+      createdAt: { type: Date, default: Date.now }
     }],
     default: []
   },
