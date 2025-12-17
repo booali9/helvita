@@ -1,11 +1,12 @@
-const bcrypt = require('bcryptjs');
-const User = require('../models/User');
-const PersonalProfile = require('../models/PersonalProfile');
-const BusinessProfile = require('../models/BusinessProfile');
-const { validationResult } = require('express-validator');
-const otpService = require('../services/otpService');
-const jwtService = require('../services/jwtService');
-const stripeService = require('../services/stripeService');
+const bcrypt = require("bcryptjs");
+const User = require("../models/User");
+const PersonalProfile = require("../models/PersonalProfile");
+const BusinessProfile = require("../models/BusinessProfile");
+const { validationResult } = require("express-validator");
+const otpService = require("../services/otpService");
+const jwtService = require("../services/jwtService");
+const stripeService = require("../services/stripeService");
+const axios = require("axios");
 
 // Register user
 const register = async (req, res) => {
@@ -19,36 +20,41 @@ const register = async (req, res) => {
   try {
     let user = await User.findOne({ email });
     if (user) {
-      return res.status(400).json({ error: 'User already exists' });
+      return res.status(400).json({ error: "User already exists" });
     }
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
     // Generate unique referral code
-    const userReferralCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const userReferralCode = Math.random()
+      .toString(36)
+      .substring(2, 8)
+      .toUpperCase();
 
     let referredBy = null;
     if (referralCode) {
       const referrer = await User.findOne({ referralCode });
       if (referrer) {
         referredBy = referrer._id;
-        
+
         // Update referrer's sentReferrals if this email exists
-        const referralIndex = referrer.sentReferrals?.findIndex(r => r.email.toLowerCase() === email.toLowerCase());
+        const referralIndex = referrer.sentReferrals?.findIndex(
+          (r) => r.email.toLowerCase() === email.toLowerCase(),
+        );
         if (referralIndex >= 0) {
-          referrer.sentReferrals[referralIndex].status = 'Registered';
+          referrer.sentReferrals[referralIndex].status = "Registered";
           referrer.sentReferrals[referralIndex].registeredAt = new Date();
-          referrer.sentReferrals[referralIndex].name = email.split('@')[0];
+          referrer.sentReferrals[referralIndex].name = email.split("@")[0];
         } else {
           // Add to sentReferrals even if invite wasn't tracked (direct link share)
           if (!referrer.sentReferrals) referrer.sentReferrals = [];
           referrer.sentReferrals.push({
             email: email,
-            name: email.split('@')[0],
+            name: email.split("@")[0],
             sentAt: new Date(),
-            status: 'Registered',
-            registeredAt: new Date()
+            status: "Registered",
+            registeredAt: new Date(),
           });
         }
         await referrer.save();
@@ -62,7 +68,7 @@ const register = async (req, res) => {
       referralCode: userReferralCode,
       referredBy,
       savedCards: [],
-      sentReferrals: []
+      sentReferrals: [],
     });
 
     await user.save();
@@ -74,16 +80,16 @@ const register = async (req, res) => {
     await user.save();
 
     // Log OTP to console for testing
-    console.log('=================================');
+    console.log("=================================");
     console.log(`OTP for ${email}: ${otp}`);
-    console.log('=================================');
+    console.log("=================================");
 
     await otpService.sendOTP(email, otp);
 
-    res.json({ message: 'OTP sent to email' });
+    res.json({ message: "OTP sent to email" });
   } catch (err) {
     console.error(err.message);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: "Server error" });
   }
 };
 
@@ -98,7 +104,7 @@ const verifyOtp = async (req, res) => {
 
   try {
     const user = await otpService.verifyOTP(email, otp);
-    res.json({ message: 'Email verified successfully' });
+    res.json({ message: "Email verified successfully" });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -116,20 +122,20 @@ const login = async (req, res) => {
   try {
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(400).json({ error: 'Invalid credentials' });
+      return res.status(400).json({ error: "Invalid credentials" });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(400).json({ error: 'Invalid credentials' });
+      return res.status(400).json({ error: "Invalid credentials" });
     }
 
     if (!user.emailVerified) {
-      return res.status(400).json({ error: 'Email not verified' });
+      return res.status(400).json({ error: "Email not verified" });
     }
 
     if (!user.identityVerified) {
-      return res.status(400).json({ error: 'Identity not verified' });
+      return res.status(400).json({ error: "Identity not verified" });
     }
 
     // Admin approval check disabled for testing
@@ -141,7 +147,7 @@ const login = async (req, res) => {
     res.json({ token });
   } catch (err) {
     console.error(err.message);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: "Server error" });
   }
 };
 
@@ -149,17 +155,19 @@ const login = async (req, res) => {
 const getProfile = async (req, res) => {
   try {
     const userId = req.userId;
-    const user = await User.findById(userId).select('-password -otp -otpExpires');
+    const user = await User.findById(userId).select(
+      "-password -otp -otpExpires",
+    );
 
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({ error: "User not found" });
     }
 
     // Get profile based on account type
     let profile = null;
-    if (user.accountType === 'personal') {
+    if (user.accountType === "personal") {
       profile = await PersonalProfile.findOne({ user: userId });
-    } else if (user.accountType === 'business') {
+    } else if (user.accountType === "business") {
       profile = await BusinessProfile.findOne({ user: userId });
     }
 
@@ -172,15 +180,15 @@ const getProfile = async (req, res) => {
     // If no Stripe card but user has card name stored, create virtual card details
     if (!cardDetails && (user.cardHolderName || user.cardName)) {
       cardDetails = {
-        id: 'pending',
-        last4: '****',
+        id: "pending",
+        last4: "****",
         expMonth: new Date().getMonth() + 1,
         expYear: new Date().getFullYear() + 3,
-        brand: 'visa',
-        status: 'pending',
-        type: 'virtual',
-        cardholderName: user.cardHolderName || user.cardName || 'Card Holder',
-        created: user.createdAt
+        brand: "visa",
+        status: "pending",
+        type: "virtual",
+        cardholderName: user.cardHolderName || user.cardName || "Card Holder",
+        created: user.createdAt,
       };
     }
 
@@ -198,37 +206,39 @@ const getProfile = async (req, res) => {
         hasLinkedBank: !!user.plaidAccessToken,
         createdAt: user.createdAt,
         cardHolderName: user.cardHolderName || user.cardName || null,
-        businessNameOnCard: user.businessNameOnCard || null
+        businessNameOnCard: user.businessNameOnCard || null,
       },
-      profile: profile ? {
-        fullName: profile.fullName || null,
-        address: profile.address || profile.residentialAddress || null,
-        city: profile.city || null,
-        state: profile.state || null,
-        zipcode: profile.zipcode || null,
-        // Personal specific fields
-        ...(user.accountType === 'personal' && {
-          dateOfBirth: profile.dateOfBirth || null,
-          investmentType: profile.investmentType || null
-        }),
-        // Business specific fields
-        ...(user.accountType === 'business' && {
-          businessType: profile.businessType || null,
-          roleInBusiness: profile.roleInBusiness || null,
-          businessPhone: profile.businessPhone || null,
-          businessAddress: profile.businessAddress || null,
-          nameOnCard: profile.nameOnCard || null,
-          businessNameOnCard: profile.businessNameOnCard || null
-        })
-      } : null,
+      profile: profile
+        ? {
+            fullName: profile.fullName || null,
+            address: profile.address || profile.residentialAddress || null,
+            city: profile.city || null,
+            state: profile.state || null,
+            zipcode: profile.zipcode || null,
+            // Personal specific fields
+            ...(user.accountType === "personal" && {
+              dateOfBirth: profile.dateOfBirth || null,
+              investmentType: profile.investmentType || null,
+            }),
+            // Business specific fields
+            ...(user.accountType === "business" && {
+              businessType: profile.businessType || null,
+              roleInBusiness: profile.roleInBusiness || null,
+              businessPhone: profile.businessPhone || null,
+              businessAddress: profile.businessAddress || null,
+              nameOnCard: profile.nameOnCard || null,
+              businessNameOnCard: profile.businessNameOnCard || null,
+            }),
+          }
+        : null,
       card: cardDetails,
-      savedCards: user.savedCards || []
+      savedCards: user.savedCards || [],
     };
 
     res.json(response);
   } catch (err) {
-    console.error('Error getting profile:', err.message);
-    res.status(500).json({ error: 'Server error' });
+    console.error("Error getting profile:", err.message);
+    res.status(500).json({ error: "Server error" });
   }
 };
 
@@ -236,35 +246,41 @@ const getProfile = async (req, res) => {
 const getReferrals = async (req, res) => {
   try {
     const userId = req.userId;
-    const user = await User.findById(userId).select('sentReferrals referralCode');
+    const user = await User.findById(userId).select(
+      "sentReferrals referralCode",
+    );
 
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({ error: "User not found" });
     }
 
     // Format referrals for display
-    const referrals = (user.sentReferrals || []).map(ref => ({
+    const referrals = (user.sentReferrals || []).map((ref) => ({
       id: ref._id,
       email: ref.email,
-      name: ref.name || ref.email.split('@')[0],
-      date: ref.sentAt ? new Date(ref.sentAt).toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric' 
-      }) : 'N/A',
-      status: ref.status || 'Pending',
-      registeredAt: ref.registeredAt
+      name: ref.name || ref.email.split("@")[0],
+      date: ref.sentAt
+        ? new Date(ref.sentAt).toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+          })
+        : "N/A",
+      status: ref.status || "Pending",
+      registeredAt: ref.registeredAt,
     }));
 
     res.json({
       referrals,
       referralCode: user.referralCode,
       totalReferrals: referrals.length,
-      completedReferrals: referrals.filter(r => r.status === 'Registered' || r.status === 'Completed').length
+      completedReferrals: referrals.filter(
+        (r) => r.status === "Registered" || r.status === "Completed",
+      ).length,
     });
   } catch (err) {
-    console.error('Error getting referrals:', err.message);
-    res.status(500).json({ error: 'Server error' });
+    console.error("Error getting referrals:", err.message);
+    res.status(500).json({ error: "Server error" });
   }
 };
 
@@ -277,38 +293,38 @@ const deleteAccount = async (req, res) => {
     // Find user
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({ error: "User not found" });
     }
 
     // Verify password if provided
     if (password) {
-      const bcrypt = require('bcryptjs');
+      const bcrypt = require("bcryptjs");
       const isMatch = await bcrypt.compare(password, user.password);
       if (!isMatch) {
-        return res.status(400).json({ error: 'Incorrect password' });
+        return res.status(400).json({ error: "Incorrect password" });
       }
     }
 
     // Delete associated profile
-    const PersonalProfile = require('../models/PersonalProfile');
-    const BusinessProfile = require('../models/BusinessProfile');
-    
-    if (user.accountType === 'personal') {
+    const PersonalProfile = require("../models/PersonalProfile");
+    const BusinessProfile = require("../models/BusinessProfile");
+
+    if (user.accountType === "personal") {
       await PersonalProfile.findOneAndDelete({ user: userId });
-    } else if (user.accountType === 'business') {
+    } else if (user.accountType === "business") {
       await BusinessProfile.findOneAndDelete({ user: userId });
     }
 
     // Delete the user
     await User.findByIdAndDelete(userId);
 
-    res.json({ 
-      message: 'Account deleted successfully',
-      success: true 
+    res.json({
+      message: "Account deleted successfully",
+      success: true,
     });
   } catch (err) {
-    console.error('Error deleting account:', err.message);
-    res.status(500).json({ error: 'Server error' });
+    console.error("Error deleting account:", err.message);
+    res.status(500).json({ error: "Server error" });
   }
 };
 
@@ -325,26 +341,30 @@ const forgotPassword = async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) {
       // Don't reveal if user exists or not for security
-      return res.json({ message: 'If an account exists with this email, you will receive a password reset OTP' });
+      return res.json({
+        message:
+          "If an account exists with this email, you will receive a password reset OTP",
+      });
     }
 
     // Generate and send OTP
     const otp = otpService.generateOTP();
     user.resetPasswordOtp = otp;
-    user.resetPasswordOtpExpires = Date.now() + parseInt(process.env.OTP_EXPIRY || 10) * 60 * 1000;
+    user.resetPasswordOtpExpires =
+      Date.now() + parseInt(process.env.OTP_EXPIRY || 10) * 60 * 1000;
     await user.save();
 
     // Log OTP to console for testing
-    console.log('=================================');
+    console.log("=================================");
     console.log(`Password Reset OTP for ${email}: ${otp}`);
-    console.log('=================================');
+    console.log("=================================");
 
-    await otpService.sendOTP(email, otp, 'Password Reset');
+    await otpService.sendOTP(email, otp, "Password Reset");
 
-    res.json({ message: 'Password reset OTP sent to email' });
+    res.json({ message: "Password reset OTP sent to email" });
   } catch (err) {
-    console.error('Forgot password error:', err.message);
-    res.status(500).json({ error: 'Server error' });
+    console.error("Forgot password error:", err.message);
+    res.status(500).json({ error: "Server error" });
   }
 };
 
@@ -360,21 +380,21 @@ const verifyResetOtp = async (req, res) => {
   try {
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(400).json({ error: 'Invalid request' });
+      return res.status(400).json({ error: "Invalid request" });
     }
 
     if (!user.resetPasswordOtp || user.resetPasswordOtp !== otp) {
-      return res.status(400).json({ error: 'Invalid OTP' });
+      return res.status(400).json({ error: "Invalid OTP" });
     }
 
     if (user.resetPasswordOtpExpires < Date.now()) {
-      return res.status(400).json({ error: 'OTP has expired' });
+      return res.status(400).json({ error: "OTP has expired" });
     }
 
-    res.json({ message: 'OTP verified successfully', valid: true });
+    res.json({ message: "OTP verified successfully", valid: true });
   } catch (err) {
-    console.error('Verify reset OTP error:', err.message);
-    res.status(500).json({ error: 'Server error' });
+    console.error("Verify reset OTP error:", err.message);
+    res.status(500).json({ error: "Server error" });
   }
 };
 
@@ -390,15 +410,15 @@ const resetPassword = async (req, res) => {
   try {
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(400).json({ error: 'Invalid request' });
+      return res.status(400).json({ error: "Invalid request" });
     }
 
     if (!user.resetPasswordOtp || user.resetPasswordOtp !== otp) {
-      return res.status(400).json({ error: 'Invalid OTP' });
+      return res.status(400).json({ error: "Invalid OTP" });
     }
 
     if (user.resetPasswordOtpExpires < Date.now()) {
-      return res.status(400).json({ error: 'OTP has expired' });
+      return res.status(400).json({ error: "OTP has expired" });
     }
 
     // Hash new password
@@ -411,10 +431,78 @@ const resetPassword = async (req, res) => {
     user.resetPasswordOtpExpires = undefined;
     await user.save();
 
-    res.json({ message: 'Password reset successfully' });
+    res.json({ message: "Password reset successfully" });
   } catch (err) {
-    console.error('Reset password error:', err.message);
-    res.status(500).json({ error: 'Server error' });
+    console.error("Reset password error:", err.message);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+// Google Login
+const googleLogin = async (req, res) => {
+  const { credential } = req.body;
+
+  if (!credential) {
+    return res.status(400).json({ error: "Credential is required" });
+  }
+
+  try {
+    // Verify the Google ID token
+    const response = await axios.get(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`,
+    );
+    const payload = response.data;
+
+    if (!payload.email_verified) {
+      return res.status(400).json({ error: "Email not verified by Google" });
+    }
+
+    const { email, name, sub: googleId } = payload;
+
+    // Check if user exists
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      // Create new user
+      const userReferralCode = Math.random()
+        .toString(36)
+        .substring(2, 8)
+        .toUpperCase();
+
+      user = new User({
+        email,
+        password: "", // No password for Google users
+        accountType: "personal", // Default to personal
+        referralCode: userReferralCode,
+        referredBy: null,
+        savedCards: [],
+        sentReferrals: [],
+        emailVerified: true, // Google verified
+        identityVerified: false, // Still need identity verification
+        adminApproved: true, // Auto approve for Google login
+        googleId,
+      });
+
+      await user.save();
+    } else {
+      // Update googleId if not set
+      if (!user.googleId) {
+        user.googleId = googleId;
+        await user.save();
+      }
+    }
+
+    // Generate JWT token
+    const token = jwtService.generateToken(user._id);
+
+    res.json({
+      token,
+      accountId: user._id,
+      message: "Login successful",
+    });
+  } catch (error) {
+    console.error("Google login error:", error.message);
+    res.status(500).json({ error: "Google login failed" });
   }
 };
 
@@ -427,5 +515,6 @@ module.exports = {
   deleteAccount,
   forgotPassword,
   verifyResetOtp,
-  resetPassword
+  resetPassword,
+  googleLogin,
 };
