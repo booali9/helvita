@@ -461,9 +461,11 @@ const googleLogin = async (req, res) => {
 
     // Check if user exists
     let user = await User.findOne({ email });
+    let isNewUser = false;
 
     if (!user) {
       // Create new user
+      isNewUser = true;
       const userReferralCode = Math.random()
         .toString(36)
         .substring(2, 8)
@@ -472,7 +474,7 @@ const googleLogin = async (req, res) => {
       user = new User({
         email,
         password: "", // No password for Google users
-        accountType: "personal", // Default to personal
+        accountType: "business", // Default to business
         referralCode: userReferralCode,
         referredBy: null,
         savedCards: [],
@@ -485,9 +487,17 @@ const googleLogin = async (req, res) => {
 
       await user.save();
     } else {
-      // Update googleId if not set
+      // Update googleId and ensure accountType exists
+      let needsSave = false;
       if (!user.googleId) {
         user.googleId = googleId;
+        needsSave = true;
+      }
+      if (!user.accountType) {
+        user.accountType = "business";
+        needsSave = true;
+      }
+      if (needsSave) {
         await user.save();
       }
     }
@@ -498,6 +508,8 @@ const googleLogin = async (req, res) => {
     res.json({
       token,
       accountId: user._id,
+      accountType: user.accountType,
+      isNewUser,
       message: "Login successful",
     });
   } catch (error) {
