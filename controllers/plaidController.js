@@ -150,6 +150,8 @@ const getReserves = async (req, res) => {
       accountId: account.account_id,
       name: account.name,
       type: account.type,
+      subtype: account.subtype,
+      mask: account.mask,
       currentBalance: account.balances.current,
       availableBalance: account.balances.available,
       currency: account.balances.iso_currency_code

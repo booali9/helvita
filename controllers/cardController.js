@@ -1,6 +1,103 @@
 const stripeService = require('../services/stripeService');
 const User = require('../models/User');
 
+// Get billing history from Stripe
+const getBillingHistory = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    let billingHistory = [];
+
+    // If user has a Stripe customer ID, fetch real billing data
+    if (user.stripeCustomerId) {
+      try {
+        const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+        
+        // Get invoices from Stripe
+        const invoices = await stripe.invoices.list({
+          customer: user.stripeCustomerId,
+          limit: 50,
+        });
+
+        // Get charges from Stripe
+        const charges = await stripe.charges.list({
+          customer: user.stripeCustomerId,
+          limit: 50,
+        });
+
+        // Format invoices
+        invoices.data.forEach(invoice => {
+          billingHistory.push({
+            id: invoice.id,
+            date: new Date(invoice.created * 1000).toISOString().split('T')[0],
+            description: invoice.description || 'Invoice',
+            amount: (invoice.amount_paid / 100).toFixed(2),
+            currency: invoice.currency.toUpperCase(),
+            status: invoice.status === 'paid' ? 'Paid' : invoice.status === 'open' ? 'Pending' : invoice.status,
+            type: 'invoice'
+          });
+        });
+
+        // Format charges
+        charges.data.forEach(charge => {
+          // Avoid duplicates from invoices
+          if (!charge.invoice) {
+            billingHistory.push({
+              id: charge.id,
+              date: new Date(charge.created * 1000).toISOString().split('T')[0],
+              description: charge.description || 'Payment',
+              amount: (charge.amount / 100).toFixed(2),
+              currency: charge.currency.toUpperCase(),
+              status: charge.status === 'succeeded' ? 'Paid' : charge.status === 'pending' ? 'Pending' : 'Failed',
+              type: 'charge'
+            });
+          }
+        });
+
+        // Sort by date descending
+        billingHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+      } catch (stripeError) {
+        console.error('Stripe billing fetch error:', stripeError.message);
+        // Continue with empty billing if Stripe fails
+      }
+    }
+
+    // Also include transfers as billing activity
+    if (user.transfers && user.transfers.length > 0) {
+      user.transfers.forEach(transfer => {
+        billingHistory.push({
+          id: transfer.id || transfer.stripePaymentIntentId,
+          date: new Date(transfer.createdAt).toISOString().split('T')[0],
+          description: transfer.description || `Transfer to ${transfer.destination}`,
+          amount: transfer.amount.toFixed(2),
+          currency: 'USD',
+          status: transfer.status === 'completed' ? 'Paid' : transfer.status === 'pending' ? 'Pending' : transfer.status,
+          type: 'transfer'
+        });
+      });
+
+      // Re-sort after adding transfers
+      billingHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
+    }
+
+    res.json({
+      success: true,
+      billingHistory: billingHistory,
+      total: billingHistory.length
+    });
+
+  } catch (error) {
+    console.error('Error fetching billing history:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 // Add external card/payment method
 const addCard = async (req, res) => {
   try {
@@ -160,4 +257,5 @@ module.exports = {
   createInvoice,
   listInvoices,
   makePayment,
+  getBillingHistory,
 };
