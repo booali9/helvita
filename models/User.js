@@ -125,4 +125,25 @@ userSchema.pre("save", function (next) {
   next();
 });
 
+// Drop any stale indexes that might cause issues (like username_1)
+userSchema.statics.cleanupIndexes = async function () {
+  try {
+    const indexes = await this.collection.indexes();
+    const staleIndexes = ["username_1", "activation_key_1"]; // Add any other stale index names here
+
+    for (const index of indexes) {
+      if (staleIndexes.includes(index.name)) {
+        console.log(`Dropping stale index: ${index.name}`);
+        await this.collection.dropIndex(index.name);
+      }
+    }
+  } catch (error) {
+    // Index might not exist, which is fine
+    if (error.code !== 27) {
+      // 27 = IndexNotFound
+      console.error("Error cleaning up indexes:", error.message);
+    }
+  }
+};
+
 module.exports = mongoose.model("User", userSchema);

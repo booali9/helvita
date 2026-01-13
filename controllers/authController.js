@@ -131,11 +131,20 @@ const login = async (req, res) => {
     }
 
     if (!user.emailVerified) {
-      return res.status(400).json({ error: "Email not verified" });
+      return res.status(400).json({ 
+        error: "Email not verified",
+        code: "EMAIL_NOT_VERIFIED",
+        email: email
+      });
     }
 
     if (!user.identityVerified) {
-      return res.status(400).json({ error: "Identity not verified" });
+      return res.status(400).json({ 
+        error: "Identity verification pending. Please complete the verification process.",
+        code: "IDENTITY_NOT_VERIFIED",
+        email: email,
+        accountType: user.accountType
+      });
     }
 
     // Admin approval check disabled for testing
@@ -144,7 +153,17 @@ const login = async (req, res) => {
     // }
 
     const token = jwtService.generateToken(user._id);
-    res.json({ token });
+    
+    // Return more user data for proper account provisioning
+    res.json({ 
+      token,
+      accountId: user._id,
+      accountType: user.accountType,
+      email: user.email,
+      hasLinkedBank: !!user.plaidAccessToken,
+      hasCard: !!user.stripeCardId,
+      cardHolderName: user.cardHolderName || user.cardName || null
+    });
   } catch (err) {
     console.error(err.message);
     res.status(500).json({ error: "Server error" });

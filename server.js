@@ -6,6 +6,9 @@ const cors = require('cors');
 // Swagger
 const { swaggerUi, specs } = require('./config/swagger');
 
+// Models
+const User = require('./models/User');
+
 // Routes
 const authRoutes = require('./routes/auth');
 const personalRoutes = require('./routes/personal');
@@ -56,7 +59,11 @@ app.use('/api/support', supportRoutes);
 
 // MongoDB connection
 mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log('MongoDB connected'))
+  .then(async () => {
+    console.log('MongoDB connected');
+    // Clean up stale indexes that might cause duplicate key errors
+    await User.cleanupIndexes();
+  })
   .catch(err => console.log(err));
 
 // Error handling middleware
