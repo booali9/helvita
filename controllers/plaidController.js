@@ -1,6 +1,9 @@
 const plaidService = require('../services/plaidService');
 const stripeService = require('../services/stripeService');
 const User = require('../models/User');
+const CurrencyAccount = require('../models/CurrencyAccount');
+const CurrencyTransaction = require('../models/CurrencyTransaction');
+const mongoose = require('mongoose');
 
 // Create link token for Plaid Link
 const createLinkToken = async (req, res) => {
@@ -18,6 +21,7 @@ const exchangePublicToken = async (req, res) => {
   try {
     const { publicToken } = req.body;
     const userId = req.userId;
+    const userObjectId = new mongoose.Types.ObjectId(userId);
 
     const { accessToken, itemId } = await plaidService.exchangePublicToken(publicToken);
 
@@ -27,7 +31,104 @@ const exchangePublicToken = async (req, res) => {
       plaidItemId: itemId,
     });
 
-    res.json({ message: 'Account linked successfully' });
+    // Get Plaid accounts to get total balance
+    const accounts = await plaidService.getAccounts(accessToken);
+    const totalBalance = accounts.reduce((sum, acc) => sum + (acc.balances.available || acc.balances.current || 0), 0);
+
+    // Auto-create USD currency account if it doesn't exist
+    let usdAccount = await CurrencyAccount.findOne({
+      user: userObjectId,
+      currency: 'USD'
+    });
+
+    if (!usdAccount) {
+      // Generate account number
+      const timestamp = Date.now().toString();
+      const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const accountNumber = `USD-${timestamp}-${random}`;
+
+      // Create USD currency account with the Plaid balance
+      usdAccount = new CurrencyAccount({
+        user: userObjectId,
+        currency: 'USD',
+        balance: totalBalance,
+        accountNumber: accountNumber
+      });
+
+      await usdAccount.save();
+
+      // Add account reference to user
+      await User.findByIdAndUpdate(userId, {
+        $push: { currencyAccounts: usdAccount._id }
+      });
+
+      // Generate transaction ID
+      const txnTimestamp = Date.now().toString(36);
+      const txnRandom = Math.random().toString(36).substring(2, 10);
+      const transactionId = `TXN-${txnTimestamp}-${txnRandom}`.toUpperCase();
+
+      // Create initial funding transaction
+      const fundingTransaction = new CurrencyTransaction({
+        user: userObjectId,
+        currencyAccount: usdAccount._id,
+        transactionId: transactionId,
+        type: 'deposit',
+        amount: totalBalance,
+        currency: 'USD',
+        balanceAfter: totalBalance,
+        description: 'Initial funding from Plaid bank account',
+        status: 'completed',
+        metadata: {
+          source: 'plaid',
+          plaidItemId: itemId
+        }
+      });
+
+      await fundingTransaction.save();
+
+      console.log(`Auto-created USD account for user ${userId} with balance $${totalBalance}`);
+    } else {
+      // Update existing USD account balance with Plaid balance
+      const previousBalance = usdAccount.balance;
+      usdAccount.balance = totalBalance;
+      await usdAccount.save();
+
+      // Create sync transaction if balance changed
+      if (previousBalance !== totalBalance) {
+        // Generate transaction ID
+        const syncTxnTimestamp = Date.now().toString(36);
+        const syncTxnRandom = Math.random().toString(36).substring(2, 10);
+        const syncTransactionId = `TXN-${syncTxnTimestamp}-${syncTxnRandom}`.toUpperCase();
+
+        const syncTransaction = new CurrencyTransaction({
+          user: userObjectId,
+          currencyAccount: usdAccount._id,
+          transactionId: syncTransactionId,
+          type: totalBalance > previousBalance ? 'deposit' : 'withdrawal',
+          amount: Math.abs(totalBalance - previousBalance),
+          currency: 'USD',
+          balanceAfter: totalBalance,
+          description: 'Balance synced with Plaid bank account',
+          status: 'completed',
+          metadata: {
+            source: 'plaid_sync',
+            plaidItemId: itemId
+          }
+        });
+
+        await syncTransaction.save();
+        console.log(`Synced USD account for user ${userId}: $${previousBalance} -> $${totalBalance}`);
+      }
+    }
+
+    res.json({ 
+      message: 'Account linked successfully',
+      currencyAccount: {
+        id: usdAccount._id,
+        currency: 'USD',
+        balance: totalBalance
+      }
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

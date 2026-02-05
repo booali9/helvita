@@ -114,6 +114,11 @@ const userSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "BusinessProfile",
     },
+    // Multi-currency accounts
+    currencyAccounts: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "CurrencyAccount",
+    }],
   },
   { timestamps: true },
 );

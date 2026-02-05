@@ -19,6 +19,7 @@ const setupRoutes = require('./routes/setup');
 const plaidRoutes = require('./routes/plaid');
 const cardRoutes = require('./routes/card');
 const supportRoutes = require('./routes/support');
+const currencyRoutes = require('./routes/currency');
 
 const app = express();
 
@@ -56,15 +57,41 @@ app.use('/api/setup', setupRoutes);
 app.use('/api/plaid', plaidRoutes);
 app.use('/api/card', cardRoutes);
 app.use('/api/support', supportRoutes);
+app.use('/api/currency', currencyRoutes);
 
-// MongoDB connection
-mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(async () => {
-    console.log('MongoDB connected');
+// MongoDB connection with proper async handling
+const connectDB = async () => {
+  try {
+    // Don't disable buffering initially
+    const conn = await mongoose.connect(process.env.MONGO_URI, { 
+      useNewUrlParser: true, 
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 10000, // Timeout after 10s instead of 30s
+      socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
+      maxPoolSize: 10, // Maintain up to 10 socket connections
+      serverSelectionTimeoutMS: 5000, // Keep trying to send operations for 5 seconds
+      heartbeatFrequencyMS: 10000, // Send a ping every 10 seconds
+    });
+    
+    console.log('MongoDB connected successfully');
     // Clean up stale indexes that might cause duplicate key errors
     await User.cleanupIndexes();
-  })
-  .catch(err => console.log(err));
+    return conn;
+  } catch (error) {
+    console.error('MongoDB connection error:', error.message);
+    // Retry connection after 5 seconds
+    setTimeout(() => {
+      console.log('Retrying MongoDB connection...');
+      connectDB();
+    }, 5000);
+    throw error;
+  }
+};
+
+// Initialize connection
+connectDB().catch(err => {
+  console.error('Failed to connect to MongoDB:', err.message);
+});
 
 // Error handling middleware
 app.use((err, req, res, next) => {
