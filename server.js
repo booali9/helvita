@@ -25,7 +25,12 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: ['https://helvitafrontend.vercel.app', 'http://localhost:5173', 'http://localhost:3000']
+  origin: [
+    'https://helvitafrontend.vercel.app',
+    'https://stingray-app-kqakx.ondigitalocean.app',
+    'http://localhost:5173',
+    'http://localhost:3000'
+  ]
 }));
 
 // Root route
