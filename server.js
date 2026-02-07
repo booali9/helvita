@@ -26,6 +26,8 @@ const app = express();
 // Middleware
 app.use(cors({
   origin: [
+    'https://helvation.com',
+    'https://www.helvation.com',
     'https://helvitafrontend.vercel.app',
     'https://stingray-app-kqakx.ondigitalocean.app',
     'http://localhost:5173',
